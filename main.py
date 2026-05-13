@@ -1,7 +1,6 @@
 from api import search_movie
 from recommendations import recommend_movies
-
-favorites = []
+from favorites import add_to_favorites, view_favorites, favorites
 
 movie_name = input("Enter movie name: ")
 
@@ -14,12 +13,20 @@ if movie["Response"] == "True":
     print(movie["Title"])
     print(movie["Genre"])
 
-    favorites.append(movie)
+    add = input("\nAdd to favorites? (yes/no): ").lower()
 
-    recommendation = recommend_movies(favorites)
+    if add == "yes":
+     add_to_favorites(movie)
 
-    print("\nRecommendation:")
-    print(recommendation)
+     recommendation = recommend_movies(favorites)
+
+     print("\nRecommendation:")
+     print(recommendation)
+    
+    view = input("\nView favorite movies? (yes/no): ").lower()
+
+    if view == "yes":
+     view_favorites()
 
 else:
     print("Movie not found.")
