@@ -1,20 +1,25 @@
 from api import search_movie
+from recommendations import recommend_movies
 
+favorites = []
 
 movie_name = input("Enter movie name: ")
 
 movie = search_movie(movie_name)
  
+
 if movie["Response"] == "True":
 
-    print("\nMovies Found:\n")
+    print("\nMovie Found")
+    print(movie["Title"])
+    print(movie["Genre"])
 
-    for item in movie["Search"]:
+    favorites.append(movie)
 
-        print(f"Title: {item['Title']}")
-        print(f"Year: {item['Year']}")
-        print(f"Type: {item['Type']}")
-        print("-" * 30)
+    recommendation = recommend_movies(favorites)
+
+    print("\nRecommendation:")
+    print(recommendation)
 
 else:
     print("Movie not found.")
