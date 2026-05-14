@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from database import authenticate_user, init_database, register_user
+from api import search_movie
+from database import add_favorite, authenticate_user, init_database, mark_watched, register_user
 
 
 COLORS = {
@@ -18,6 +19,7 @@ class CineTrackApp(tk.Tk):
         super().__init__()
         init_database()
         self.user = None
+        self.current_movie = None
         self.title("CineTrack")
         self.geometry("980x620")
         self.minsize(860, 540)
@@ -54,7 +56,8 @@ class CineTrackApp(tk.Tk):
             child.destroy()
         if not self.user:
             return
-        tk.Button(self.nav, text="Sign out", command=self.show_login, bg=COLORS["panel"], fg=COLORS["text"], relief="flat", anchor="w", padx=14, pady=10).pack(fill="x")
+        for text, command in (("Search", self.show_search), ("Sign out", self.show_login)):
+            tk.Button(self.nav, text=text, command=command, bg=COLORS["panel"], fg=COLORS["text"], relief="flat", anchor="w", padx=14, pady=10).pack(fill="x", pady=3)
 
     def _clear(self):
         for child in self.content.winfo_children():
@@ -83,13 +86,13 @@ class CineTrackApp(tk.Tk):
                 return
             self.user = user
             self._set_nav()
-            self._page_title("Signed in", f"Hello, {self.user['username']}.")
+            self.show_search()
 
         def register():
             try:
                 self.user = {"id": register_user(username.get(), password.get()), "username": username.get().strip()}
                 self._set_nav()
-                self._page_title("Account ready", f"Hello, {self.user['username']}.")
+                self.show_search()
             except ValueError as exc:
                 messagebox.showerror("Registration failed", str(exc))
 
@@ -97,6 +100,46 @@ class CineTrackApp(tk.Tk):
         row.pack(anchor="e", pady=(4, 0))
         ttk.Button(row, text="Create account", command=register).pack(side="left", padx=(0, 10))
         ttk.Button(row, text="Sign in", style="Accent.TButton", command=login).pack(side="left")
+
+    def show_search(self):
+        self._clear()
+        self._page_title("Find a movie", f"Signed in as {self.user['username']}")
+        search_row = ttk.Frame(self.content)
+        search_row.pack(fill="x")
+        query = tk.StringVar()
+        ttk.Entry(search_row, textvariable=query).pack(side="left", fill="x", expand=True, padx=(0, 10))
+        ttk.Button(search_row, text="Search", style="Accent.TButton", command=lambda: run_search()).pack(side="left")
+
+        result = ttk.Frame(self.content, style="Panel.TFrame", padding=22)
+        result.pack(fill="both", expand=True, pady=24)
+        title = ttk.Label(result, text="Search for a title to begin.", style="Card.TLabel", font=("Segoe UI Semibold", 18))
+        details = ttk.Label(result, text="", style="Card.TLabel", wraplength=650, justify="left")
+        title.pack(anchor="w")
+        details.pack(anchor="w", pady=(10, 20))
+
+        actions = ttk.Frame(result, style="Panel.TFrame")
+        actions.pack(anchor="w")
+        ttk.Button(actions, text="Add favorite", command=lambda: self._save_current(add_favorite, "favorites")).pack(side="left", padx=(0, 10))
+        ttk.Button(actions, text="Mark watched", command=lambda: self._save_current(mark_watched, "watch history")).pack(side="left")
+
+        def run_search():
+            if not query.get().strip():
+                return
+            movie = search_movie(query.get().strip())
+            if movie.get("Response") != "True":
+                messagebox.showinfo("No match", "I could not find that title.")
+                return
+            self.current_movie = movie
+            # A single useful block beats scattering tiny labels all over the page.
+            title.config(text=f"{movie.get('Title')} ({movie.get('Year')})")
+            details.config(text=f"Genre: {movie.get('Genre', 'N/A')}\nRating: {movie.get('imdbRating', 'N/A')}\nDirector: {movie.get('Director', 'N/A')}\n\n{movie.get('Plot', 'No plot summary available.')}")
+
+    def _save_current(self, saver, label):
+        if not self.current_movie:
+            messagebox.showinfo("Nothing selected", "Search for a movie first.")
+            return
+        saved = saver(self.user["id"], self.current_movie)
+        messagebox.showinfo("Saved" if saved else "Already saved", f"Updated your {label}.")
 
 
 if __name__ == "__main__":
