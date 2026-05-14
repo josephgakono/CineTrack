@@ -2,7 +2,15 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from api import search_movie
-from database import add_favorite, authenticate_user, init_database, mark_watched, register_user
+from database import (
+    add_favorite,
+    authenticate_user,
+    init_database,
+    list_favorites,
+    list_watch_history,
+    mark_watched,
+    register_user,
+)
 
 
 COLORS = {
@@ -40,6 +48,8 @@ class CineTrackApp(tk.Tk):
         style.configure("TEntry", fieldbackground="#f6f7fb", padding=8)
         style.configure("TButton", padding=(14, 8), font=("Segoe UI Semibold", 10))
         style.configure("Accent.TButton", background=COLORS["accent"], foreground="#16120a")
+        style.configure("Treeview", rowheight=30, background="#f7f8fb", fieldbackground="#f7f8fb")
+        style.configure("Treeview.Heading", font=("Segoe UI Semibold", 10))
 
     def _build_shell(self):
         self.sidebar = ttk.Frame(self, style="Panel.TFrame", width=210)
@@ -56,7 +66,7 @@ class CineTrackApp(tk.Tk):
             child.destroy()
         if not self.user:
             return
-        for text, command in (("Search", self.show_search), ("Sign out", self.show_login)):
+        for text, command in (("Search", self.show_search), ("Library", self.show_library), ("Sign out", self.show_login)):
             tk.Button(self.nav, text=text, command=command, bg=COLORS["panel"], fg=COLORS["text"], relief="flat", anchor="w", padx=14, pady=10).pack(fill="x", pady=3)
 
     def _clear(self):
@@ -140,6 +150,28 @@ class CineTrackApp(tk.Tk):
             return
         saved = saver(self.user["id"], self.current_movie)
         messagebox.showinfo("Saved" if saved else "Already saved", f"Updated your {label}.")
+
+    def show_library(self):
+        self._clear()
+        self._page_title("Your library", "Favorites and watch history are kept in the local database.")
+        tabs = ttk.Notebook(self.content)
+        tabs.pack(fill="both", expand=True)
+        self._movie_table(tabs, "Favorites", list_favorites(self.user["id"]), "created_at")
+        self._movie_table(tabs, "Watched", list_watch_history(self.user["id"]), "watched_date")
+
+    def _movie_table(self, tabs, name, rows, date_key):
+        frame = ttk.Frame(tabs, padding=12)
+        tabs.add(frame, text=name)
+        columns = ("title", "year", "genre", "rating", "date")
+        tree = ttk.Treeview(frame, columns=columns, show="headings")
+        for col, width in (("title", 220), ("year", 70), ("genre", 220), ("rating", 80), ("date", 140)):
+            tree.heading(col, text=col.title())
+            tree.column(col, width=width, anchor="w")
+        tree.pack(fill="both", expand=True)
+
+        # The database already knows the shape; the GUI only formats it for quick scanning.
+        for row in rows:
+            tree.insert("", "end", values=(row["movie_title"], row["year"], row["genre"], row["rating"], row.get(date_key, "")))
 
 
 if __name__ == "__main__":
