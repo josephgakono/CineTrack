@@ -9,8 +9,10 @@ from database import (
     list_favorites,
     list_watch_history,
     mark_watched,
+    recommendation_movies,
     register_user,
 )
+from recommendations import recommend_movies
 
 
 COLORS = {
@@ -66,7 +68,12 @@ class CineTrackApp(tk.Tk):
             child.destroy()
         if not self.user:
             return
-        for text, command in (("Search", self.show_search), ("Library", self.show_library), ("Sign out", self.show_login)):
+        for text, command in (
+            ("Search", self.show_search),
+            ("Library", self.show_library),
+            ("Recommendations", self.show_recommendations),
+            ("Sign out", self.show_login),
+        ):
             tk.Button(self.nav, text=text, command=command, bg=COLORS["panel"], fg=COLORS["text"], relief="flat", anchor="w", padx=14, pady=10).pack(fill="x", pady=3)
 
     def _clear(self):
@@ -172,6 +179,18 @@ class CineTrackApp(tk.Tk):
         # The database already knows the shape; the GUI only formats it for quick scanning.
         for row in rows:
             tree.insert("", "end", values=(row["movie_title"], row["year"], row["genre"], row["rating"], row.get(date_key, "")))
+
+    def show_recommendations(self):
+        self._clear()
+        movies = recommendation_movies(self.user["id"])
+        self._page_title("Recommendations", "Based on the genres you favorite and mark as watched.")
+        ttk.Label(self.content, text=recommend_movies(movies), wraplength=700, font=("Segoe UI Semibold", 16)).pack(anchor="w", pady=(0, 24))
+
+        for movie in movies[:8]:
+            item = ttk.Frame(self.content, style="Panel.TFrame", padding=14)
+            item.pack(fill="x", pady=5)
+            ttk.Label(item, text=movie["movie_title"], style="Card.TLabel", font=("Segoe UI Semibold", 12)).pack(anchor="w")
+            ttk.Label(item, text=f"{movie.get('year', '')} | {movie.get('genre', 'Unknown')}", style="Card.TLabel").pack(anchor="w")
 
 
 if __name__ == "__main__":
