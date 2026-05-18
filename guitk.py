@@ -130,6 +130,33 @@ class CineTrackApp(tk.Tk):
         ttk.Label(copy, text=subtitle, style="Card.TLabel", wraplength=610).pack(anchor="w")
         return item
 
+    def _scrollable_frame(self, parent):
+        shell = ttk.Frame(parent)
+        canvas = tk.Canvas(shell, bg=COLORS["bg"], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(shell, orient="vertical", command=canvas.yview)
+        inner = ttk.Frame(canvas)
+        window_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        def update_scroll_region(_event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def fit_inner_width(event):
+            canvas.itemconfigure(window_id, width=event.width)
+
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        inner.bind("<Configure>", update_scroll_region)
+        canvas.bind("<Configure>", fit_inner_width)
+        canvas.bind("<Enter>", lambda _event: canvas.bind_all("<MouseWheel>", on_mousewheel))
+        canvas.bind("<Leave>", lambda _event: canvas.unbind_all("<MouseWheel>"))
+
+        return shell, inner
+
     def show_login(self):
         self.user = None
         self._set_nav()
@@ -226,10 +253,13 @@ class CineTrackApp(tk.Tk):
             ttk.Label(frame, text=f"No {name.lower()} movies yet.", style="Muted.TLabel").pack(anchor="w")
             return
 
+        scroll_shell, list_frame = self._scrollable_frame(frame)
+        scroll_shell.pack(fill="both", expand=True)
+
         for row in rows:
             title = f"{row['movie_title']} ({row.get('year', '')})"
             subtitle = f"{row.get('genre', 'Unknown')} | IMDb: {row.get('rating', 'N/A')} | {row.get(date_key, '')}"
-            card = self._movie_card(frame, title, subtitle, row.get("poster"))
+            card = self._movie_card(list_frame, title, subtitle, row.get("poster"))
             ttk.Button(card, text="Delete", command=lambda movie=row, card=card: self._delete_library_movie(card, name, movie, delete_handler)).pack(side="right", anchor="n")
 
     def _delete_library_movie(self, card, list_name, movie, delete_handler):
@@ -254,8 +284,8 @@ class CineTrackApp(tk.Tk):
         summary = ttk.Label(self.content, text=recommend_movies(movies), wraplength=700, font=("Segoe UI Semibold", 14))
         summary.pack(anchor="w", pady=(0, 18))
 
-        results = ttk.Frame(self.content)
-        results.pack(fill="both", expand=True)
+        results_shell, results = self._scrollable_frame(self.content)
+        results_shell.pack(fill="both", expand=True)
 
         def show_recommendation_rows(recommendations, empty_message):
             for child in results.winfo_children():
