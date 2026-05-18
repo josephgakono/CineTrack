@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from api import search_movie
+from api import search_movie, search_movies
 from database import (
     add_favorite,
     authenticate_user,
@@ -14,7 +14,7 @@ from database import (
     remove_favorite,
     register_user,
 )
-from recommendations import recommend_movies
+from recommendations import recommend_movies, recommend_titles_from_movie
 
 
 COLORS = {
@@ -208,14 +208,44 @@ class CineTrackApp(tk.Tk):
         search_row.pack(fill="x", pady=(0, 18))
         seed_title = tk.StringVar()
         ttk.Entry(search_row, textvariable=seed_title).pack(side="left", fill="x", expand=True, padx=(0, 10))
-        ttk.Button(search_row, text="Recommend titles", style="Accent.TButton", command=lambda: messagebox.showinfo("Title needed", "Enter a movie title first.")).pack(side="left")
+        ttk.Button(search_row, text="Recommend titles", style="Accent.TButton", command=lambda: run_title_recommendation()).pack(side="left")
 
         summary = ttk.Label(self.content, text=recommend_movies(movies), wraplength=700, font=("Segoe UI Semibold", 14))
         summary.pack(anchor="w", pady=(0, 18))
 
         results = ttk.Frame(self.content)
         results.pack(fill="both", expand=True)
-        ttk.Label(results, text="Enter a title above to generate movie recommendations.", style="Muted.TLabel").pack(anchor="w")
+
+        def show_recommendation_rows(recommendations, empty_message):
+            for child in results.winfo_children():
+                child.destroy()
+
+            if not recommendations:
+                ttk.Label(results, text=empty_message, style="Muted.TLabel").pack(anchor="w")
+                return
+
+            for movie in recommendations:
+                item = ttk.Frame(results, style="Panel.TFrame", padding=14)
+                item.pack(fill="x", pady=5)
+                ttk.Label(item, text=f"{movie['title']} ({movie.get('year', '')})", style="Card.TLabel", font=("Segoe UI Semibold", 12)).pack(anchor="w")
+                ttk.Label(item, text=f"{movie.get('genre', 'Unknown')} | IMDb: {movie.get('rating', 'N/A')} | {movie.get('reason', '')}", style="Card.TLabel").pack(anchor="w")
+
+        def run_title_recommendation():
+            title = seed_title.get().strip()
+            if not title:
+                messagebox.showinfo("Title needed", "Enter a movie title first.")
+                return
+
+            seed_movie = search_movie(title)
+            if seed_movie.get("Response") != "True":
+                messagebox.showinfo("No match", "I could not find that movie title.")
+                return
+
+            recommendations = recommend_titles_from_movie(seed_movie, movies, search_movies, search_movie)
+            summary.config(text=f"Because you searched for {seed_movie.get('Title')}, here are related movie titles.")
+            show_recommendation_rows(recommendations, "No title recommendations found. Try another movie title.")
+
+        show_recommendation_rows([], "Enter a title above to generate movie recommendations.")
 
 
 if __name__ == "__main__":
