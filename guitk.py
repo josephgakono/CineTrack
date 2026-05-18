@@ -5,6 +5,7 @@ from api import search_movie
 from database import (
     add_favorite,
     authenticate_user,
+    delete_watch_entry,
     init_database,
     list_favorites,
     list_watch_history,
@@ -12,7 +13,6 @@ from database import (
     recommendation_movies,
     remove_favorite,
     register_user,
-    delete_watch_entry,
 )
 from recommendations import recommend_movies
 
@@ -202,14 +202,20 @@ class CineTrackApp(tk.Tk):
     def show_recommendations(self):
         self._clear()
         movies = recommendation_movies(self.user["id"])
-        self._page_title("Recommendations", "Based on the genres you favorite and mark as watched.")
-        ttk.Label(self.content, text=recommend_movies(movies), wraplength=700, font=("Segoe UI Semibold", 16)).pack(anchor="w", pady=(0, 24))
+        self._page_title("Recommendations", "Enter a movie title to find related titles from similar genres, directors, or actors.")
 
-        for movie in movies[:8]:
-            item = ttk.Frame(self.content, style="Panel.TFrame", padding=14)
-            item.pack(fill="x", pady=5)
-            ttk.Label(item, text=movie["movie_title"], style="Card.TLabel", font=("Segoe UI Semibold", 12)).pack(anchor="w")
-            ttk.Label(item, text=f"{movie.get('year', '')} | {movie.get('genre', 'Unknown')}", style="Card.TLabel").pack(anchor="w")
+        search_row = ttk.Frame(self.content)
+        search_row.pack(fill="x", pady=(0, 18))
+        seed_title = tk.StringVar()
+        ttk.Entry(search_row, textvariable=seed_title).pack(side="left", fill="x", expand=True, padx=(0, 10))
+        ttk.Button(search_row, text="Recommend titles", style="Accent.TButton", command=lambda: messagebox.showinfo("Title needed", "Enter a movie title first.")).pack(side="left")
+
+        summary = ttk.Label(self.content, text=recommend_movies(movies), wraplength=700, font=("Segoe UI Semibold", 14))
+        summary.pack(anchor="w", pady=(0, 18))
+
+        results = ttk.Frame(self.content)
+        results.pack(fill="both", expand=True)
+        ttk.Label(results, text="Enter a title above to generate movie recommendations.", style="Muted.TLabel").pack(anchor="w")
 
 
 if __name__ == "__main__":
