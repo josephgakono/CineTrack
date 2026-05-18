@@ -10,7 +10,9 @@ from database import (
     list_watch_history,
     mark_watched,
     recommendation_movies,
+    remove_favorite,
     register_user,
+    delete_watch_entry,
 )
 from recommendations import recommend_movies
 
@@ -160,13 +162,13 @@ class CineTrackApp(tk.Tk):
 
     def show_library(self):
         self._clear()
-        self._page_title("Your library", "Favorites and watch history are kept in the local database.")
+        self._page_title("Your library", "Select a movie in Favorites or Watched, then choose Delete selected to remove it.")
         tabs = ttk.Notebook(self.content)
         tabs.pack(fill="both", expand=True)
-        self._movie_table(tabs, "Favorites", list_favorites(self.user["id"]), "created_at")
-        self._movie_table(tabs, "Watched", list_watch_history(self.user["id"]), "watched_date")
+        self._movie_table(tabs, "Favorites", list_favorites(self.user["id"]), "created_at", remove_favorite)
+        self._movie_table(tabs, "Watched", list_watch_history(self.user["id"]), "watched_date", delete_watch_entry)
 
-    def _movie_table(self, tabs, name, rows, date_key):
+    def _movie_table(self, tabs, name, rows, date_key, delete_handler):
         frame = ttk.Frame(tabs, padding=12)
         tabs.add(frame, text=name)
         columns = ("title", "year", "genre", "rating", "date")
@@ -178,7 +180,24 @@ class CineTrackApp(tk.Tk):
 
         # The database already knows the shape; the GUI only formats it for quick scanning.
         for row in rows:
-            tree.insert("", "end", values=(row["movie_title"], row["year"], row["genre"], row["rating"], row.get(date_key, "")))
+            tree.insert("", "end", iid=str(row["id"]), values=(row["movie_title"], row["year"], row["genre"], row["rating"], row.get(date_key, "")))
+
+        ttk.Label(frame, text=f"Tip: select one {name.lower()} movie and click Delete selected.", style="Muted.TLabel").pack(anchor="w", pady=(10, 6))
+        ttk.Button(frame, text="Delete selected", command=lambda: self._delete_selected(tree, name, delete_handler)).pack(anchor="e")
+
+    def _delete_selected(self, tree, list_name, delete_handler):
+        selection = tree.selection()
+        if not selection:
+            messagebox.showinfo("Nothing selected", f"Choose a movie from {list_name} first.")
+            return
+
+        movie_id = int(selection[0])
+        title = tree.item(selection[0], "values")[0]
+        if not messagebox.askyesno("Delete movie", f"Remove '{title}' from {list_name}?"):
+            return
+
+        delete_handler(self.user["id"], movie_id)
+        tree.delete(selection[0])
 
     def show_recommendations(self):
         self._clear()
