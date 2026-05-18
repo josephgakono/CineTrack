@@ -75,3 +75,59 @@ def _candidate_queries(seed_movie):
 
     return queries
 
+
+def _matches_reason(movie, candidate):
+    if candidate["kind"] == "title":
+        return True
+
+    if candidate["kind"] == "genre":
+        return candidate["value"] in _split_values(movie.get("Genre", ""))
+
+    if candidate["kind"] == "director":
+        return candidate["value"] == movie.get("Director", "").strip()
+
+    if candidate["kind"] == "actor":
+        return candidate["value"] in _split_values(movie.get("Actors", ""))
+
+    return False
+
+
+def recommend_titles_from_movie(seed_movie, saved_movies, searcher, detail_lookup, limit=6):
+    if seed_movie.get("Response") != "True":
+        return []
+
+    seed_title = seed_movie.get("Title", "").strip().lower()
+    blocked_titles = _known_titles(saved_movies)
+    blocked_titles.add(seed_title)
+    recommendations = {}
+
+    for candidate in _candidate_queries(seed_movie):
+        for result in searcher(candidate["query"]):
+            title = result.get("Title", "").strip()
+            title_key = title.lower()
+            if not title or title_key in blocked_titles:
+                continue
+
+            movie = detail_lookup(title)
+            if movie.get("Response") != "True":
+                continue
+            if not _matches_reason(movie, candidate):
+                continue
+
+            title_key = movie.get("Title", title).strip().lower()
+            if title_key in blocked_titles:
+                continue
+
+            if title_key not in recommendations:
+                recommendations[title_key] = {
+                    "title": movie.get("Title", title),
+                    "year": movie.get("Year", result.get("Year", "")),
+                    "genre": movie.get("Genre", "Unknown"),
+                    "rating": movie.get("imdbRating", "N/A"),
+                    "reason": candidate["reason"],
+                }
+
+            if len(recommendations) >= limit:
+                return list(recommendations.values())
+
+    return list(recommendations.values())
