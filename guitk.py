@@ -213,8 +213,12 @@ class CineTrackApp(tk.Tk):
 
         actions = ttk.Frame(info, style="Panel.TFrame")
         actions.pack(anchor="w")
-        ttk.Button(actions, text="Add favorite", command=lambda: self._save_current(add_favorite, "favorites")).pack(side="left", padx=(0, 10))
-        ttk.Button(actions, text="Mark watched", command=lambda: self._save_current(mark_watched, "watch history")).pack(side="left")
+        favorite_button = ttk.Button(actions, text="Add favorite")
+        watched_button = ttk.Button(actions, text="Mark watched")
+        favorite_button.config(command=lambda: self._save_current(add_favorite, "favorites", favorite_button, "Added to favorites"))
+        watched_button.config(command=lambda: self._save_current(mark_watched, "watch history", watched_button, "Marked as watched"))
+        favorite_button.pack(side="left", padx=(0, 10))
+        watched_button.pack(side="left")
 
         def run_search():
             if not query.get().strip():
@@ -228,14 +232,18 @@ class CineTrackApp(tk.Tk):
             for child in poster_slot.winfo_children():
                 child.destroy()
             self._poster_label(poster_slot, movie.get("Poster"), size=(118, 176)).pack(anchor="n")
+            favorite_button.config(text="Add favorite")
+            watched_button.config(text="Mark watched")
             title.config(text=f"{movie.get('Title')} ({movie.get('Year')})")
             details.config(text=f"Genre: {movie.get('Genre', 'N/A')}\nRating: {movie.get('imdbRating', 'N/A')}\nDirector: {movie.get('Director', 'N/A')}\n\n{movie.get('Plot', 'No plot summary available.')}")
 
-    def _save_current(self, saver, label):
+    def _save_current(self, saver, label, button=None, saved_text=None):
         if not self.current_movie:
             messagebox.showinfo("Nothing selected", "Search for a movie first.")
             return
         saved = saver(self.user["id"], self.current_movie)
+        if button and saved_text:
+            button.config(text=saved_text if saved else "Already saved")
         messagebox.showinfo("Saved" if saved else "Already saved", f"Updated your {label}.")
 
     def show_library(self):
