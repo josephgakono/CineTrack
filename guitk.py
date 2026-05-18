@@ -1,5 +1,9 @@
 import tkinter as tk
+from io import BytesIO
 from tkinter import messagebox, ttk
+
+import requests
+from PIL import Image, ImageTk
 
 from api import search_movie, search_movies
 from database import (
@@ -32,6 +36,7 @@ class CineTrackApp(tk.Tk):
         init_database()
         self.user = None
         self.current_movie = None
+        self.poster_cache = {}
         self.title("CineTrack")
         self.geometry("980x620")
         self.minsize(860, 540)
@@ -86,6 +91,45 @@ class CineTrackApp(tk.Tk):
         ttk.Label(self.content, text=title, style="Title.TLabel").pack(anchor="w")
         ttk.Label(self.content, text=subtitle, style="Muted.TLabel").pack(anchor="w", pady=(2, 22))
 
+    def _poster_image(self, poster_url, size=(86, 128)):
+        if not poster_url or poster_url == "N/A":
+            return None
+
+        cache_key = (poster_url, size)
+        if cache_key in self.poster_cache:
+            return self.poster_cache[cache_key]
+
+        try:
+            response = requests.get(poster_url, timeout=8)
+            response.raise_for_status()
+            image = Image.open(BytesIO(response.content))
+            image.thumbnail(size)
+            photo = ImageTk.PhotoImage(image)
+        except (requests.RequestException, OSError, tk.TclError):
+            return None
+
+        self.poster_cache[cache_key] = photo
+        return photo
+
+    def _poster_label(self, parent, poster_url, size=(86, 128)):
+        photo = self._poster_image(poster_url, size)
+        if photo:
+            label = ttk.Label(parent, image=photo, style="Card.TLabel")
+            label.image = photo
+            return label
+
+        return ttk.Label(parent, text="Poster\nunavailable", style="Card.TLabel", width=14, anchor="center", justify="center")
+
+    def _movie_card(self, parent, title, subtitle, poster_url):
+        item = ttk.Frame(parent, style="Panel.TFrame", padding=14)
+        item.pack(fill="x", pady=5)
+        self._poster_label(item, poster_url).pack(side="left", padx=(0, 14))
+        copy = ttk.Frame(item, style="Panel.TFrame")
+        copy.pack(side="left", fill="x", expand=True)
+        ttk.Label(copy, text=title, style="Card.TLabel", font=("Segoe UI Semibold", 12)).pack(anchor="w")
+        ttk.Label(copy, text=subtitle, style="Card.TLabel", wraplength=610).pack(anchor="w")
+        return item
+
     def show_login(self):
         self.user = None
         self._set_nav()
@@ -131,12 +175,16 @@ class CineTrackApp(tk.Tk):
 
         result = ttk.Frame(self.content, style="Panel.TFrame", padding=22)
         result.pack(fill="both", expand=True, pady=24)
-        title = ttk.Label(result, text="Search for a title to begin.", style="Card.TLabel", font=("Segoe UI Semibold", 18))
-        details = ttk.Label(result, text="", style="Card.TLabel", wraplength=650, justify="left")
+        poster_slot = ttk.Frame(result, style="Panel.TFrame")
+        poster_slot.pack(side="left", anchor="n", padx=(0, 18))
+        info = ttk.Frame(result, style="Panel.TFrame")
+        info.pack(side="left", fill="both", expand=True)
+        title = ttk.Label(info, text="Search for a title to begin.", style="Card.TLabel", font=("Segoe UI Semibold", 18))
+        details = ttk.Label(info, text="", style="Card.TLabel", wraplength=650, justify="left")
         title.pack(anchor="w")
         details.pack(anchor="w", pady=(10, 20))
 
-        actions = ttk.Frame(result, style="Panel.TFrame")
+        actions = ttk.Frame(info, style="Panel.TFrame")
         actions.pack(anchor="w")
         ttk.Button(actions, text="Add favorite", command=lambda: self._save_current(add_favorite, "favorites")).pack(side="left", padx=(0, 10))
         ttk.Button(actions, text="Mark watched", command=lambda: self._save_current(mark_watched, "watch history")).pack(side="left")
@@ -150,6 +198,9 @@ class CineTrackApp(tk.Tk):
                 return
             self.current_movie = movie
             # A single useful block beats scattering tiny labels all over the page.
+            for child in poster_slot.winfo_children():
+                child.destroy()
+            self._poster_label(poster_slot, movie.get("Poster"), size=(118, 176)).pack(anchor="n")
             title.config(text=f"{movie.get('Title')} ({movie.get('Year')})")
             details.config(text=f"Genre: {movie.get('Genre', 'N/A')}\nRating: {movie.get('imdbRating', 'N/A')}\nDirector: {movie.get('Director', 'N/A')}\n\n{movie.get('Plot', 'No plot summary available.')}")
 
@@ -171,33 +222,23 @@ class CineTrackApp(tk.Tk):
     def _movie_table(self, tabs, name, rows, date_key, delete_handler):
         frame = ttk.Frame(tabs, padding=12)
         tabs.add(frame, text=name)
-        columns = ("title", "year", "genre", "rating", "date")
-        tree = ttk.Treeview(frame, columns=columns, show="headings")
-        for col, width in (("title", 220), ("year", 70), ("genre", 220), ("rating", 80), ("date", 140)):
-            tree.heading(col, text=col.title())
-            tree.column(col, width=width, anchor="w")
-        tree.pack(fill="both", expand=True)
-
-        # The database already knows the shape; the GUI only formats it for quick scanning.
-        for row in rows:
-            tree.insert("", "end", iid=str(row["id"]), values=(row["movie_title"], row["year"], row["genre"], row["rating"], row.get(date_key, "")))
-
-        ttk.Label(frame, text=f"Tip: select one {name.lower()} movie and click Delete selected.", style="Muted.TLabel").pack(anchor="w", pady=(10, 6))
-        ttk.Button(frame, text="Delete selected", command=lambda: self._delete_selected(tree, name, delete_handler)).pack(anchor="e")
-
-    def _delete_selected(self, tree, list_name, delete_handler):
-        selection = tree.selection()
-        if not selection:
-            messagebox.showinfo("Nothing selected", f"Choose a movie from {list_name} first.")
+        if not rows:
+            ttk.Label(frame, text=f"No {name.lower()} movies yet.", style="Muted.TLabel").pack(anchor="w")
             return
 
-        movie_id = int(selection[0])
-        title = tree.item(selection[0], "values")[0]
+        for row in rows:
+            title = f"{row['movie_title']} ({row.get('year', '')})"
+            subtitle = f"{row.get('genre', 'Unknown')} | IMDb: {row.get('rating', 'N/A')} | {row.get(date_key, '')}"
+            card = self._movie_card(frame, title, subtitle, row.get("poster"))
+            ttk.Button(card, text="Delete", command=lambda movie=row, card=card: self._delete_library_movie(card, name, movie, delete_handler)).pack(side="right", anchor="n")
+
+    def _delete_library_movie(self, card, list_name, movie, delete_handler):
+        title = movie["movie_title"]
         if not messagebox.askyesno("Delete movie", f"Remove '{title}' from {list_name}?"):
             return
 
-        delete_handler(self.user["id"], movie_id)
-        tree.delete(selection[0])
+        delete_handler(self.user["id"], movie["id"])
+        card.destroy()
 
     def show_recommendations(self):
         self._clear()
@@ -225,10 +266,12 @@ class CineTrackApp(tk.Tk):
                 return
 
             for movie in recommendations:
-                item = ttk.Frame(results, style="Panel.TFrame", padding=14)
-                item.pack(fill="x", pady=5)
-                ttk.Label(item, text=f"{movie['title']} ({movie.get('year', '')})", style="Card.TLabel", font=("Segoe UI Semibold", 12)).pack(anchor="w")
-                ttk.Label(item, text=f"{movie.get('genre', 'Unknown')} | IMDb: {movie.get('rating', 'N/A')} | {movie.get('reason', '')}", style="Card.TLabel").pack(anchor="w")
+                self._movie_card(
+                    results,
+                    f"{movie['title']} ({movie.get('year', '')})",
+                    f"{movie.get('genre', 'Unknown')} | IMDb: {movie.get('rating', 'N/A')} | {movie.get('reason', '')}",
+                    movie.get("poster"),
+                )
 
         def run_title_recommendation():
             title = seed_title.get().strip()

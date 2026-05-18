@@ -44,11 +44,12 @@ The system also stores user data locally using a database and retrieves movie in
 - Internet connection (for API requests)
 - Required library:
   - requests
+  - Pillow
 
 Install required library using:
 
  ```bash
- pip install requests
+ pip install requests Pillow
  ```
 
 

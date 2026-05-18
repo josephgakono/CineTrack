@@ -125,6 +125,7 @@ def recommend_titles_from_movie(seed_movie, saved_movies, searcher, detail_looku
                     "year": movie.get("Year", result.get("Year", "")),
                     "genre": movie.get("Genre", "Unknown"),
                     "rating": movie.get("imdbRating", "N/A"),
+                    "poster": movie.get("Poster", result.get("Poster", "")),
                     "reason": candidate["reason"],
                 }
 
