@@ -202,7 +202,7 @@ class CineTrackApp(tk.Tk):
     def show_recommendations(self):
         self._clear()
         movies = recommendation_movies(self.user["id"])
-        self._page_title("Recommendations", "Enter a movie title to find related titles from similar genres, directors, or actors.")
+        self._page_title("Recommendations", "Enter a movie title to find genre-first related movie titles.")
 
         search_row = ttk.Frame(self.content)
         search_row.pack(fill="x", pady=(0, 18))
@@ -242,7 +242,7 @@ class CineTrackApp(tk.Tk):
                 return
 
             recommendations = recommend_titles_from_movie(seed_movie, movies, search_movies, search_movie)
-            summary.config(text=f"Because you searched for {seed_movie.get('Title')}, here are related movie titles.")
+            summary.config(text=f"Because you searched for {seed_movie.get('Title')}, here are genre-first related movie titles.")
             show_recommendation_rows(recommendations, "No title recommendations found. Try another movie title.")
 
         show_recommendation_rows([], "Enter a title above to generate movie recommendations.")

@@ -65,9 +65,10 @@ def _candidate_queries(seed_movie):
     actors = _split_values(seed_movie.get("Actors", ""))
     director = seed_movie.get("Director", "").strip()
 
-    queries = _title_queries(seed_movie.get("Title", ""))
+    queries = []
     if genres:
         queries.append({"query": genres[0], "kind": "genre", "value": genres[0], "reason": f"shares the {genres[0]} genre"})
+    queries.extend(_title_queries(seed_movie.get("Title", "")))
     if director and director != "N/A":
         queries.append({"query": director, "kind": "director", "value": director, "reason": f"also directed by {director}"})
     if actors:
