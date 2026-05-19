@@ -86,3 +86,8 @@ python3 main.py
 - Advanced filtering and search options
 - Movie sorting in favorites and history
 - Enhanced movie details display
+
+## Screenshots
+![Login page](/images/screenshot%20(2).png)
+![Search page](/images/screenshot%20(3).png)
+![Library page](/images/screenshot%20(1).png)
